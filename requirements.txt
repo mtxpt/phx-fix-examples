@@ -1,0 +1,27 @@
+numpy
+pandas
+scipy
+matplotlib
+jupyter
+tzlocal
+pytz
+requests
+aiohttp
+sortedcontainers
+more-itertools
+tabulate
+pyyaml
+tomli
+tomli-w
+netifaces-plus
+pytest
+deepdiff
+prometheus_client
+
+# pip install git+https://github.com/mtxpt/phx-fix-base.git@master
+# pip install git+file:///Users/dani/repos-work/matrixport/work/phx-fix-base
+# pip uninstall phx-fix-base
+
+# arch other than arm64 and Windows should be able to install quickfix without a patch
+quickfix; platform_machine != 'arm64' and sys_platform != 'win32'
+

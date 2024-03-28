@@ -1,0 +1,60 @@
+roq-cache/
+roq-data/
+
+#quickfix build
+build-quickfix/
+
+# remove files with secrets
+config/deribit.toml
+config/deribit_test.toml
+config/binance.toml
+config/binance-futures.toml
+config/binance-futures_fapi.toml
+config/binance-futures_dapi.toml
+
+
+
+# Python
+*.pyc
+__pycache__/
+venv/
+
+# roq
+run/
+
+# intellij
+.idea/
+
+# vim
+*.sw[po]
+
+# cmake
+*.[ao]
+*.cmake
+*.so
+*.dylib
+CMake*.in
+CMakeCache.txt
+CMakeFiles/
+DartConfiguration.tcl
+Makefile
+Testing/
+build/
+compile_commands.json*
+install_manifest.txt
+lib/
+external/
+external-prefix/
+
+# cpack
+_CPack_Packages/
+
+# debian
+*.deb
+
+# conda installed
+opt/
+log_opt/
+
+# Mac
+.DS_Store

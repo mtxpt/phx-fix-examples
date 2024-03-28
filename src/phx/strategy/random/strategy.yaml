@@ -1,0 +1,39 @@
+{
+  "trading_symbols": [["deribit", "BTC-PERPETUAL"], ["deribit", "ETH-PERPETUAL"]],
+
+  "quantity": 100,
+  "delay": "00:00:05.000",
+
+  # can be "all_at_once", "one_by_one"
+  "symbol_selection": "all_at_once",
+
+  # trading direction can be "random", "alternate" (starting direction is random or fixed)
+  "trading_direction": "alternate",
+  "initial_trading_direction": "buy",  # can be either buy or sell
+
+  # trading mode, can be "market_orders", "aggressive_limit_orders"
+  "trading_mode": "aggressive_limit_orders",
+  "aggressiveness_in_pips": 2,
+
+  # timeout
+  "timeout": "12:00:00.000",
+
+  # standard timer should fire every one hour - used to save files and purge history data
+  "timer_interval": "01:00:00",
+  "timer_alignment_freq": "1h",
+
+  # cancel on exit
+  "cancel_orders_on_exit": True,
+  "use_mass_cancel_request": True,
+  "cancel_timeout_seconds": 5,
+  "save_before_cancel_orders_on_exit": True,
+
+  # error handing on gateway not ready
+  "cancel_on_gateway_not_ready": True,
+
+  # std configuration
+  "subscribe_for_position_updates": True,
+  "subscribe_for_trade_capture_reports": True,
+  "compare_order_status": True,
+  "print_reports": True,
+}

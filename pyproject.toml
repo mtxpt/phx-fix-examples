@@ -1,0 +1,41 @@
+[build-system]
+requires = [
+    "setuptools >= 61.0"
+]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src/"]
+include = ["phx.strategy", "phx.strategy.base", "phx.strategy.random", "phx.service"]
+
+[project]
+name = "phx-fix-examples"
+description = "Phoenix Prime FIX strategy examples"
+version = "0.9"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+  {name = "Daniel Egloff", email = "daniel.egloff@matrixport.com"},
+]
+maintainers = [
+  {name = "Daniel Egloff", email = "daniel.egloff@matrixport.com"}
+]
+requires-python = ">= 3.11"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scipy",
+    "tzlocal",
+    "pytz",
+    "requests",
+    "aiohttp",
+    "sortedcontainers",
+    "more-itertools",
+    "tabulate",
+    "pyyaml",
+    "tomli",
+    "tomli-w",
+    "deepdiff",
+    "prometheus_client",
+    "netifaces-plus",
+]
