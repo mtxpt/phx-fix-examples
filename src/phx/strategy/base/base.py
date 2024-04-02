@@ -356,10 +356,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
         pass
 
     def on_gateway_not_ready(self, msg: GatewayNotReady):
-        self.logger.error(
-            f"on_gateway_not_ready: "
-            f"\n  report = [{msg}] "
-        )
+        self.logger.error(f"on_gateway_not_ready: {msg}")
         self.completed = True
         self.exception = Exception("GatewayNotReady")
 
@@ -370,16 +367,10 @@ class StrategyBase(StrategyInterface, abc.ABC):
         )
 
     def on_business_message_reject(self, msg: BusinessMessageReject):
-        self.logger.error(
-            f"on_business_message_reject: "
-            f"\n  report = [{msg}] "
-        )
+        self.logger.error(f"on_business_message_reject: {msg}")
 
     def on_market_data_request_reject(self, msg: MarketDataRequestReject):
-        self.logger.error(
-            f"on_market_data_request_reject: "
-            f"\n  report = [{msg}] "
-        )
+        self.logger.error(f"on_market_data_request_reject: {msg}")
 
     def on_security_report(self, msg: SecurityReport):
         for security in msg.securities.values():
@@ -388,10 +379,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
         self.logger.info(f"<==== security list completed")
 
     def on_position_request_ack(self, msg: PositionRequestAck):
-        self.logger.info(
-            f"on_position_request_ack: "
-            f"\n  report = [{msg}] "
-        )
+        self.logger.info(f"on_position_request_ack: {msg}")
 
     def on_position_reports(self, msg: PositionReports):
         if self.starting_barriers.pop(self.POSITION_SNAPSHOTS, 0):
