@@ -1,17 +1,16 @@
 import math
 from enum import Enum
 from logging import Logger
-from typing import Set, Dict, Tuple, Optional
-
+from typing import Dict, Tuple, Optional
+from scipy.stats import bernoulli
 import pandas as pd
 import quickfix as fix
+
+from phx.utils import TO_PIPS
 from phx.fix.app import AppRunner
 from phx.fix.utils import fix_message_string, flip_trading_dir
-from phx.utils import TO_PIPS
-from scipy.stats import bernoulli
-
 from phx.strategy.base import StrategyBase
-from phx.strategy.base.types import ExchangeId, SymbolId, Ticker
+from phx.strategy.base.types import ExchangeId, SymbolId
 
 
 class SymbolSelection(str, Enum):

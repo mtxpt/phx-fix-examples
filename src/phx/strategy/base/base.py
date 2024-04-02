@@ -19,8 +19,7 @@ from phx.fix.tracker import OrderTracker, PositionTracker
 from phx.fix.utils import fix_message_string
 from phx.utils.thread import AlignedRepeatingTimer
 
-from phx.strategy.base.interface import StrategyInterface, StrategyExecState
-from phx.strategy.base.types import Ticker
+from phx.strategy.base import StrategyInterface, StrategyExecState, Ticker
 
 
 class StrategyBase(StrategyInterface, abc.ABC):

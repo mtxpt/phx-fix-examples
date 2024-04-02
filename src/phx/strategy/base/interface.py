@@ -1,7 +1,8 @@
 import abc
 from enum import IntEnum
-
 import pandas as pd
+from typing import List
+
 from phx.fix.model import Logon, Logout, Heartbeat
 from phx.fix.model import OrderBookSnapshot, OrderBookUpdate, Trades
 from phx.fix.model import ExecReport, PositionReports, SecurityReport, TradeCaptureReport
@@ -10,7 +11,7 @@ from phx.fix.model import PositionRequestAck, TradeCaptureReportRequestAck
 from phx.fix.model import OrderMassCancelReport
 
 
-class StrategyExecState(str, IntEnum):
+class StrategyExecState(IntEnum):
     STOPPED = 0
     LOGING_IN = 1
     LOGGED_IN = 2
