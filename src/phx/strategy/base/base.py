@@ -1,7 +1,7 @@
 import abc
 import queue
 from logging import Logger
-from typing import Set, Dict, Tuple, Union
+from typing import List, Set, Dict, Tuple, Union
 
 import pandas as pd
 import quickfix as fix
@@ -12,7 +12,7 @@ from phx.fix.model import GatewayNotReady, Reject, BusinessMessageReject, Market
 from phx.fix.model import Logon, Create, Logout, Heartbeat
 from phx.fix.model import Order
 from phx.fix.model import OrderBookSnapshot, OrderBookUpdate, Trades
-from phx.fix.model import OrderMassCancelReport,MassStatusExecReport, MassStatusExecReportNoOrders
+from phx.fix.model import OrderMassCancelReport, MassStatusExecReport, MassStatusExecReportNoOrders
 from phx.fix.model import PositionRequestAck, TradeCaptureReportRequestAck
 from phx.fix.model.order_book import OrderBook
 from phx.fix.tracker import OrderTracker, PositionTracker
@@ -20,6 +20,30 @@ from phx.fix.utils import fix_message_string
 from phx.utils.thread import AlignedRepeatingTimer
 
 from phx.strategy.base import StrategyInterface, StrategyExecState, Ticker
+
+CHECK_MARK = u"\u2705"
+CROSS_MARK = u"\u274C"
+
+
+def single_task(key, target_dict, current_dict, pre="  ") -> List[str]:
+    rows = []
+    if key in target_dict.keys():
+        if key in current_dict.keys():
+            rows.append(f"{pre}{CROSS_MARK} {key}")
+        else:
+            rows.append(f"{pre}{CHECK_MARK} {key} ")
+    return rows
+
+
+def set_task(key, target_dict, current_dict, pre="  ") -> List[str]:
+    rows = []
+    target_set = target_dict.get(key, None)
+    if target_set is not None:
+        remaining_set = current_dict.get(key, {})
+        for task in target_set:
+            mark = CROSS_MARK if task in remaining_set else CHECK_MARK
+            rows.append(f"{pre}{mark} {key}[{task}]")
+    return rows
 
 
 class StrategyBase(StrategyInterface, abc.ABC):
@@ -59,7 +83,9 @@ class StrategyBase(StrategyInterface, abc.ABC):
         self.position_report_counter: Dict[Tuple[str, str], int] = dict()
 
         # state variables to determine readiness for trading and stopping trading
+        self.starting_reference: dict = {}
         self.starting_barriers: dict = {}
+        self.stopping_reference: dict = {}
         self.stopping_barriers: dict = {}
 
         # set from configuration
@@ -210,6 +236,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
 
     def starting(self):
         self.starting_barriers = self.get_starting_barriers()
+        self.starting_reference = self.get_starting_barriers()
         self.request_security_data()
         self.subscribe_market_data()
         self.request_working_orders()
@@ -221,7 +248,16 @@ class StrategyBase(StrategyInterface, abc.ABC):
         self.current_exec_state = StrategyExecState.STARTING
 
     def check_started(self):
-        self.logger.info(f"starting_barriers: {self.starting_barriers}")
+        self.logger.debug(f"starting_barriers: {self.starting_barriers}")
+        rows = sum(
+            [
+                single_task(self.SECURITY_REPORTS, self.starting_reference, self.starting_barriers),
+                set_task(self.ORDERBOOK_SNAPSHOTS, self.starting_reference, self.starting_barriers),
+                set_task(self.WORKING_ORDERS, self.starting_reference, self.starting_barriers),
+                single_task(self.POSITION_SNAPSHOTS, self.starting_reference, self.starting_barriers)
+            ], [])
+        line = "\n".join(rows)
+        self.logger.info(f"starting_barriers:\n{line}")
         return len(self.starting_barriers) == 0
 
     def stopping(self):
@@ -462,7 +498,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
                 )
             elif isinstance(msg, MassStatusExecReportNoOrders):
                 if msg.text != "NO ORDERS":
-                    self.logger.warn(f"unexpected text message {msg.text}")
+                    self.logger.warning(f"unexpected text message {msg.text}")
                 self.logger.info(
                     f"on_mass_status_exec_report: initial mass order status response: "
                     f"no orders for {msg.exchange} {msg.symbol}"
