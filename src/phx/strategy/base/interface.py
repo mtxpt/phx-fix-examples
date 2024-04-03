@@ -23,6 +23,11 @@ class StrategyExecState(IntEnum):
     FINISHED = 8
 
 
+class RoundingDirection(IntEnum):
+    UP = 0
+    DOWN = 1
+
+
 class StrategyInterface(abc.ABC):
 
     @abc.abstractmethod

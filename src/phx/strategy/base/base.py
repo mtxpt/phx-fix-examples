@@ -1,28 +1,26 @@
 import abc
+import math
 import queue
 from logging import Logger
-from typing import List, Set, Dict, Tuple, Union
+from typing import List, Set, Dict, Tuple, Union, Optional
 
 import pandas as pd
 import quickfix as fix
 from phx.fix.app.interface import FixInterface
 from phx.fix.app.app_runner import AppRunner
-from phx.fix.model import ExecReport, PositionReports, SecurityReport, TradeCaptureReport
+from phx.fix.model import ExecReport, PositionReports, Security, SecurityReport, TradeCaptureReport
 from phx.fix.model import GatewayNotReady, Reject, BusinessMessageReject, MarketDataRequestReject
 from phx.fix.model import Logon, Create, Logout, Heartbeat
-from phx.fix.model import Order
-from phx.fix.model import OrderBookSnapshot, OrderBookUpdate, Trades
+from phx.fix.model import Order, OrderBookSnapshot, OrderBookUpdate, Trades
 from phx.fix.model import OrderMassCancelReport, MassStatusExecReport, MassStatusExecReportNoOrders
 from phx.fix.model import PositionRequestAck, TradeCaptureReportRequestAck
 from phx.fix.model.order_book import OrderBook
 from phx.fix.tracker import OrderTracker, PositionTracker
 from phx.fix.utils import fix_message_string
 from phx.utils.thread import AlignedRepeatingTimer
+from phx.utils import CHECK_MARK, CROSS_MARK
 
-from phx.strategy.base import StrategyInterface, StrategyExecState, Ticker
-
-CHECK_MARK = u"\u2705"
-CROSS_MARK = u"\u274C"
+from phx.strategy.base import StrategyInterface, StrategyExecState, Ticker, RoundingDirection
 
 
 def single_task(key, target_dict, current_dict, pre="  ") -> List[str]:
@@ -113,6 +111,9 @@ class StrategyBase(StrategyInterface, abc.ABC):
 
         # order books
         self.order_books: Dict[Tuple[str, str], OrderBook] = {}
+
+        # security list
+        self.security_list: Dict[Tuple[str, str], Security] = {}
 
         self.exception = None
 
@@ -254,7 +255,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
                 single_task(self.SECURITY_REPORTS, self.starting_reference, self.starting_barriers),
                 set_task(self.ORDERBOOK_SNAPSHOTS, self.starting_reference, self.starting_barriers),
                 set_task(self.WORKING_ORDERS, self.starting_reference, self.starting_barriers),
-                single_task(self.POSITION_SNAPSHOTS, self.starting_reference, self.starting_barriers)
+                single_task(self.POSITION_SNAPSHOTS, self.starting_reference, self.starting_barriers),
             ], [])
         line = "\n".join(rows)
         self.logger.info(f"starting_barriers:\n{line}")
@@ -288,7 +289,13 @@ class StrategyBase(StrategyInterface, abc.ABC):
         self.current_exec_state = StrategyExecState.STOPPING
 
     def check_stopping(self) -> bool:
-        self.logger.info(f"stopping_barriers: {self.stopping_barriers}")
+        self.logger.debug(f"stopping_barriers: {self.stopping_barriers}")
+        rows = sum(
+            [
+                set_task(self.CANCEL_OPEN_ORDERS, self.stopping_reference, self.stopping_barriers),
+            ], [])
+        line = "\n".join(rows)
+        self.logger.info(f"stopping_barriers:\n{line}")
         return len(self.stopping_barriers) == 0
 
     def check_completed(self):
@@ -415,6 +422,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
 
     def on_security_report(self, msg: SecurityReport):
         for security in msg.securities.values():
+            self.security_list[(security.exchange, security.symbol)] = security
             self.logger.info(f"{security}")
         self.starting_barriers.pop(self.SECURITY_REPORTS, 0)
         self.logger.info(f"<==== security list completed")
@@ -551,6 +559,24 @@ class StrategyBase(StrategyInterface, abc.ABC):
 
     def on_trades(self, msg: Trades):
         pass
+
+    def round_down(self, price: float, direction: RoundingDirection, ticker: Ticker) -> Optional[float]:
+        min_tick_size = self.security_list.get_ticker(ticker, 0)
+        if price >= 0 and min_tick_size > 0:
+            if direction == RoundingDirection.DOWN:
+                return math.floor(price / min_tick_size) * min_tick_size
+            elif direction == RoundingDirection.UP:
+                return math.ceil(price / min_tick_size) * min_tick_size
+            else:
+                self.logger.error(f"invalid rounding direction: {direction}")
+
+    def tick_round(self, price, ticker: Ticker, min_tick_size=None):
+        min_tick_size = self.security_list.get_ticker(ticker, 0) if min_tick_size is None else min_tick_size
+        if min_tick_size <= 0.0:
+            return round(price)
+        else:
+            rem = math.trunc((price % 1) / min_tick_size)
+            return math.trunc(price) + rem * min_tick_size
 
     def file_name_prefix(self) -> str:
         username = self.fix_interface.get_username()

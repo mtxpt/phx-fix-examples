@@ -1,5 +1,6 @@
 roq-cache/
 roq-data/
+temp/
 
 #quickfix build
 build-quickfix/

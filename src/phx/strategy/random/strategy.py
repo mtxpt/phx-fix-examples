@@ -1,7 +1,7 @@
 import math
 from enum import Enum
 from logging import Logger
-from typing import Dict, Tuple, Optional
+from typing import Dict, Tuple, Optional, Set
 from scipy.stats import bernoulli
 import pandas as pd
 import quickfix as fix
@@ -40,7 +40,7 @@ class RandomStrategy(StrategyBase):
             config: dict,
             logger: Logger = None,
     ):
-        trading_symbols = {tuple(ts) for ts in config["trading_symbols"]}
+        trading_symbols: Set[Tuple[str, str]] = {tuple(ts) for ts in config["trading_symbols"]}
 
         super().__init__(
             app_runner,
@@ -64,7 +64,6 @@ class RandomStrategy(StrategyBase):
             if self.initial_trading_direction == InitialTradingDirection.BUY else fix.Side_SELL
 
         self.public_trades = []
-        self.top_of_book: Dict[Tuple[ExchangeId, SymbolId], Tuple[float, float]] = {}
 
     def round_down(self, price: float) -> Optional[float]:
         if price >= 0 and self.min_tick_size > 0:
@@ -97,9 +96,8 @@ class RandomStrategy(StrategyBase):
         account = self.fix_interface.get_account()
         for exchange, symbol in symbols:
             key = exchange, symbol
-            top_of_book = self.top_of_book.get(key, None)
-            if top_of_book is not None:
-                (top_bid, _), (top_ask, _) = top_of_book
+            book = self.order_books.get(key, None)
+            if book is not None and book.mid_price is not None:
                 if direction == fix.Side_SELL:
                     dir_str = "sell"
                 else:
@@ -119,27 +117,31 @@ class RandomStrategy(StrategyBase):
         account = self.fix_interface.get_account()
         for exchange, symbol in symbols:
             key = exchange, symbol
-            top_of_book = self.top_of_book.get(key, None)
-            if top_of_book is not None:
-                (top_bid, _), (top_ask, _) = top_of_book
-                if direction == fix.Side_SELL:
-                    price = self.round_down(top_bid * (1 - TO_PIPS * self.aggressiveness_in_pips))
-                    dir_str = "sell"
+            book = self.order_books.get(key, None)
+            if book is not None:
+                top_bid = book.top_bid_price
+                top_ask = book.top_ask_price
+                if top_bid is not None and top_ask is not None:
+                    if direction == fix.Side_SELL:
+                        price = self.round_down(top_bid * (1 - TO_PIPS * self.aggressiveness_in_pips))
+                        dir_str = "sell"
+                    else:
+                        price = self.round_up(top_ask * (1 + TO_PIPS * self.aggressiveness_in_pips))
+                        dir_str = "buy"
+                    self.logger.info(
+                        f"{exchange} Symbol {symbol}: top of book {(top_bid, top_ask)} => "
+                        f"aggressive {dir_str} {self.quantity} with limit price {price}"
+                    )
+                    order, msg = self.fix_interface.new_order_single(
+                        exchange, symbol, direction, self.quantity, price, ord_type=fix.OrdType_LIMIT, account=account
+                    )
+                    self.logger.info(
+                        f"{exchange} Symbol {symbol}: aggressive {dir_str} submitted {fix_message_string(msg)}"
+                    )
                 else:
-                    price = self.round_up(top_ask * (1 + TO_PIPS * self.aggressiveness_in_pips))
-                    dir_str = "buy"
-                self.logger.info(
-                    f"{exchange} Symbol {symbol}: top of book {top_of_book} => "
-                    f"aggressive {dir_str} {self.quantity} with limit price {price}"
-                )
-                order, msg = self.fix_interface.new_order_single(
-                    exchange, symbol, direction, self.quantity, price, ord_type=fix.OrdType_LIMIT, account=account
-                )
-                self.logger.info(
-                    f"{exchange} Symbol {symbol}: aggressive {dir_str} submitted {fix_message_string(msg)}"
-                )
+                    self.logger.info(f"order book for {exchange} {symbol} one-sided or empty!")
             else:
-                self.logger.info(f"{exchange} Symbol {symbol}: top of book empty!")
+                self.logger.info(f"no order book for {exchange} {symbol}")
 
     def trade(self):
         if self.trading_mode == TradingMode.MARKET_ORDERS:
