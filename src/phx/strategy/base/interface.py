@@ -1,14 +1,14 @@
 import abc
 from enum import IntEnum
 import pandas as pd
-from typing import List
+from typing import Union
 
-from phx.fix.model import Logon, Logout, Heartbeat
+from phx.fix.model import Logon, Create, Logout, Heartbeat
 from phx.fix.model import OrderBookSnapshot, OrderBookUpdate, Trades
 from phx.fix.model import ExecReport, PositionReports, SecurityReport, TradeCaptureReport
 from phx.fix.model import GatewayNotReady, Reject, BusinessMessageReject, MarketDataRequestReject
 from phx.fix.model import PositionRequestAck, TradeCaptureReportRequestAck
-from phx.fix.model import OrderMassCancelReport
+from phx.fix.model import OrderMassCancelReport, MassStatusExecReport, MassStatusExecReportNoOrders
 
 
 class StrategyExecState(IntEnum):
@@ -106,6 +106,10 @@ class StrategyInterface(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def on_create(self, msg: Create):
+        pass
+
+    @abc.abstractmethod
     def on_logout(self, msg: Logout):
         pass
 
@@ -158,7 +162,7 @@ class StrategyInterface(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def on_mass_status_exec_report(self, msgs: List[ExecReport]):
+    def on_mass_status_exec_report(self, msg: Union[MassStatusExecReport, MassStatusExecReportNoOrders]):
         pass
 
     @abc.abstractmethod

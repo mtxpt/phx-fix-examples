@@ -1,7 +1,7 @@
 import abc
 import queue
 from logging import Logger
-from typing import Set, Dict, Tuple, List
+from typing import Set, Dict, Tuple, Union
 
 import pandas as pd
 import quickfix as fix
@@ -9,10 +9,10 @@ from phx.fix.app.interface import FixInterface
 from phx.fix.app.app_runner import AppRunner
 from phx.fix.model import ExecReport, PositionReports, SecurityReport, TradeCaptureReport
 from phx.fix.model import GatewayNotReady, Reject, BusinessMessageReject, MarketDataRequestReject
-from phx.fix.model import Logon, Logout, Heartbeat
+from phx.fix.model import Logon, Create, Logout, Heartbeat
 from phx.fix.model import Order
 from phx.fix.model import OrderBookSnapshot, OrderBookUpdate, Trades
-from phx.fix.model import OrderMassCancelReport
+from phx.fix.model import OrderMassCancelReport,MassStatusExecReport, MassStatusExecReportNoOrders
 from phx.fix.model import PositionRequestAck, TradeCaptureReportRequestAck
 from phx.fix.model.order_book import OrderBook
 from phx.fix.tracker import OrderTracker, PositionTracker
@@ -99,7 +99,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
         return {
             self.ORDERBOOK_SNAPSHOTS: self.mkt_symbols.copy(),
             self.POSITION_SNAPSHOTS: 1,
-            self.WORKING_ORDERS: 1,
+            self.WORKING_ORDERS: self.trading_symbols.copy(),
             self.SECURITY_REPORTS: 1
         }
 
@@ -148,8 +148,10 @@ class StrategyBase(StrategyInterface, abc.ABC):
                     self.on_logon(msg)
                 elif isinstance(msg, Logout):
                     self.on_logout(msg)
+                elif isinstance(msg, Create):
+                    self.on_create(msg)
                 else:
-                    self.logger.info("unknown message {msg}")
+                    self.logger.info(f"unknown message {msg}")
 
             except queue.Empty:
                 self.logger.info(f"queue empty after waiting {self.queue_timeout.total_seconds()}s")
@@ -273,7 +275,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
         #     self.fix_interface.security_definition_request(exchange, symbol)
 
     def subscribe_market_data(self):
-        self.logger.info(f"====> subscribing market data for {self.mkt_symbols}")
+        self.logger.info(f"====> subscribing to market data for {self.mkt_symbols}...")
         for exchange_symbol in self.mkt_symbols:
             self.fix_interface.market_data_request([exchange_symbol], 0, content="book")
             self.fix_interface.market_data_request([exchange_symbol], 0, content="trade")
@@ -293,7 +295,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
     def request_position_snapshot(self):
         # note that the same account alias has to be used for all the connected exchanges
         account = self.fix_interface.get_account()
-        self.logger.info(f"====> requesting position snapshot for account {account} on {self.trading_exchanges}")
+        self.logger.info(f"====> requesting position snapshot for account {account} on {self.trading_exchanges}...")
         for exchange in self.trading_exchanges:
             msg = self.fix_interface.request_for_positions(
                 exchange,
@@ -307,7 +309,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
         # note that the same account alias has to be used for all the connected exchanges
         account = self.fix_interface.get_account()
         for (exchange, symbol) in self.trading_symbols:
-            self.logger.info(f"====> subscribing position updates for symbol {symbol} on {exchange}")
+            self.logger.info(f"====> subscribing position updates for symbol {symbol} on {exchange}...")
             msg = self.fix_interface.request_for_positions(
                 exchange,
                 account=account,
@@ -348,6 +350,9 @@ class StrategyBase(StrategyInterface, abc.ABC):
 
     def on_logon(self, msg: Logon):
         self.logged_in = True
+
+    def on_create(self, msg: Create):
+        pass
 
     def on_logout(self, msg: Logout):
         self.logged_in = False
@@ -406,11 +411,13 @@ class StrategyBase(StrategyInterface, abc.ABC):
 
     def on_exec_report(self, msg: ExecReport):
         if msg.exec_type == "I":
-            if msg.is_mass_status:
+            if msg.ord_status == fix.OrdStatus_REJECTED:
+                self.on_mass_status_exec_report(MassStatusExecReportNoOrders(msg.exchange, msg.symbol, msg.text))
+            elif msg.is_mass_status:
                 assert msg.tot_num_reports is not None and msg.last_rpt_requested is not None
                 self.mass_status_exec_reports.append(msg)
                 if len(self.mass_status_exec_reports) == msg.tot_num_reports and msg.last_rpt_requested:
-                    self.on_mass_status_exec_report(self.mass_status_exec_reports)
+                    self.on_mass_status_exec_report(MassStatusExecReport(self.mass_status_exec_reports))
                     self.mass_status_exec_reports = []
             else:
                 self.on_status_exec_report(msg)
@@ -436,20 +443,38 @@ class StrategyBase(StrategyInterface, abc.ABC):
                 f"{ExecReport.tabulate([msg])}"
             )
 
-    def on_mass_status_exec_report(self, msgs: List[ExecReport]):
-        if self.starting_barriers.pop(self.WORKING_ORDERS, False):
-            self.order_tracker.set_snapshots(msgs, self.now(), overwrite=True)
-            self.logger.info(
-                f"on_mass_status_exec_report: initial mass order status response:"
-                f"\nexec reports:"
-                f"\n{ExecReport.tabulate(msgs)}"
-                f"\npending orders:"
-                f"\n{Order.tabulate(self.order_tracker.pending_orders)}"
-                f"\nopen orders:"
-                f"\n{Order.tabulate(self.order_tracker.open_orders)}"
-                f"\nhistorical orders:"
-                f"\n{Order.tabulate(self.order_tracker.history_orders)}"
-            )
+    def on_mass_status_exec_report(self, msg: Union[MassStatusExecReport, MassStatusExecReportNoOrders]):
+        remaining: Set[Ticker] = self.starting_barriers[self.WORKING_ORDERS]
+        keys: Set[Ticker] = msg.keys()
+        if keys.issubset(remaining):
+            if isinstance(msg, MassStatusExecReport):
+                self.order_tracker.set_snapshots(msg.reports, self.now(), overwrite=True)
+                self.logger.info(
+                    f"on_mass_status_exec_report: initial mass order status response:"
+                    f"\nexec reports:"
+                    f"\n{ExecReport.tabulate(msg.reports)}"
+                    f"\npending orders:"
+                    f"\n{Order.tabulate(self.order_tracker.pending_orders)}"
+                    f"\nopen orders:"
+                    f"\n{Order.tabulate(self.order_tracker.open_orders)}"
+                    f"\nhistorical orders:"
+                    f"\n{Order.tabulate(self.order_tracker.history_orders)}"
+                )
+            elif isinstance(msg, MassStatusExecReportNoOrders):
+                if msg.text != "NO ORDERS":
+                    self.logger.warn(f"unexpected text message {msg.text}")
+                self.logger.info(
+                    f"on_mass_status_exec_report: initial mass order status response: "
+                    f"no orders for {msg.exchange} {msg.symbol}"
+                )
+
+            remaining = remaining - keys
+            self.starting_barriers[self.WORKING_ORDERS] = remaining
+            if len(remaining) == 0:
+                self.starting_barriers.pop(self.WORKING_ORDERS, None)
+                self.logger.info(f"<==== obtained working order status")
+            else:
+                self.logger.info(f"waiting for working orders status for {remaining}")
 
     def on_reject_exec_report(self, msg: ExecReport):
         self.logger.error(f"on_reject_exec_report: {msg}")
@@ -476,7 +501,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
                 self.starting_barriers.pop(self.ORDERBOOK_SNAPSHOTS)
                 self.logger.info(f"<==== order book snapshots completed")
             else:
-                self.logger.info(f"waiting orderbook snapshots for {remaining}")
+                self.logger.info(f"waiting for orderbook snapshots for {remaining}")
 
         self.order_books[msg.key()] = OrderBook(
             msg.exchange, msg.symbol, msg.bids, msg.asks, msg.exchange_ts, msg.local_ts
