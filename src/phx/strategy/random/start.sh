@@ -7,4 +7,4 @@ source "$ROOT"/../opt/conda/bin/activate dev
 
 export PYTHONPATH="$ROOT"/../:"$PYTHONPATH"
 
-cd "$ROOT"/random_strategy || (echo "Wrong path!" && exit); python3 main.py fix-settings.cfg strategy.yaml
+cd "$ROOT"/random_strategy || (echo "Wrong path!" && exit); python3 main.py strategy.yaml

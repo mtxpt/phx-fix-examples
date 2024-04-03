@@ -15,14 +15,9 @@ def temp_dir() -> Path:
 
 
 if __name__ == "__main__":
-    fix_settings_file = "fix-settings.cfg"
     strategy_config_file = f"strategy.yaml"
 
-    parser = argparse.ArgumentParser(description="FIX Client")
-    parser.add_argument(
-        "fix_settings_file", type=str, nargs='?',
-        default=fix_settings_file,
-        help="Name of quickfix settings file")
+    parser = argparse.ArgumentParser(description="Random Strategy")
     parser.add_argument(
         "strategy_config_file", type=str, nargs='?',
         default=strategy_config_file,

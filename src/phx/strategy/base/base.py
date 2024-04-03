@@ -142,6 +142,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
                 msg = self.message_queue.get(timeout=self.queue_timeout.total_seconds())
 
                 if isinstance(msg, OrderBookUpdate):
+                    print("**********")
                     self.on_order_book_update(msg)
                 elif isinstance(msg, Trades):
                     self.on_trades(msg)

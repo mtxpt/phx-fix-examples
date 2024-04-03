@@ -1,4 +1,3 @@
-import math
 from enum import Enum
 from logging import Logger
 from typing import Tuple, Optional, Set
@@ -53,18 +52,16 @@ class RandomStrategy(StrategyBase):
 
         self.min_tick_size = config.get("min_tick_size", 0.1)
         self.quantity = config["quantity"]
-        self.delay = pd.Timedelta(config["delay"])
+        self.delay = pd.Timedelta(config.get("delay", "5s"))
         self.symbol_selection = SymbolSelection(config["symbol_selection"])
         self.trading_direction = TradingDirection(config["trading_direction"])
         self.initial_trading_direction = InitialTradingDirection(config["initial_trading_direction"])
         self.trading_mode = TradingMode(config["trading_mode"])
         self.aggressiveness_in_pips = config["aggressiveness_in_pips"]
-
         self.symbol_index = 0
         self.current_trading_direction = fix.Side_BUY \
             if self.initial_trading_direction == InitialTradingDirection.BUY else fix.Side_SELL
-
-        self.public_trades = []
+        self.last_trade_time = pd.Timestamp(0, tz="UTC")
 
     def round_down(self, price: float, key: Ticker) -> Optional[float]:
         return self.round(price, RoundingDirection.DOWN, key, self.min_tick_size)
@@ -143,7 +140,11 @@ class RandomStrategy(StrategyBase):
                 self.logger.info(f"no order book for {exchange} {symbol}")
 
     def trade(self):
-        if self.trading_mode == TradingMode.MARKET_ORDERS:
-            self.submit_market_orders()
-        elif self.trading_mode == TradingMode.AGGRESSIVE_LIMIT_ORDERS:
-            self.submit_limit_orders()
+        now = pd.Timestamp.utcnow()
+        if now > self.last_trade_time + self.delay:
+            self.logger.info(f"====> run trading step {now}")
+            self.last_trade_time = now
+            if self.trading_mode == TradingMode.MARKET_ORDERS:
+                self.submit_market_orders()
+            elif self.trading_mode == TradingMode.AGGRESSIVE_LIMIT_ORDERS:
+                self.submit_limit_orders()

@@ -200,6 +200,7 @@ class StrategyInterface(abc.ABC):
     ) -> Optional[float]:
         pass
 
+    @abc.abstractmethod
     def tick_round(
             self,
             price,
