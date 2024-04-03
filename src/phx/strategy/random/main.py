@@ -28,7 +28,7 @@ if __name__ == "__main__":
     export_dir = temp_dir() / "random"
     make_dirs(export_dir)
     logger = set_file_loging_handler(
-        setup_logger("fix_service", level=logging.DEBUG),
+        setup_logger("fix_service", level=logging.INFO),
         export_dir / "fix_service.log"
     )
     message_queue = queue.Queue()
