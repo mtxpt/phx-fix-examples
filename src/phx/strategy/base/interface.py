@@ -1,7 +1,7 @@
 import abc
 from enum import IntEnum
 import pandas as pd
-from typing import Union
+from typing import Union, Optional, Tuple
 
 from phx.fix.model import Logon, Create, Logout, Heartbeat
 from phx.fix.model import OrderBookSnapshot, OrderBookUpdate, Trades
@@ -188,4 +188,22 @@ class StrategyInterface(abc.ABC):
 
     @abc.abstractmethod
     def on_trades(self, msg: Trades):
+        pass
+
+    @abc.abstractmethod
+    def round(
+            self,
+            price: float,
+            direction: RoundingDirection,
+            ticker: Tuple[str, str],
+            min_tick_size=None
+    ) -> Optional[float]:
+        pass
+
+    def tick_round(
+            self,
+            price,
+            ticker: Tuple[str, str],
+            min_tick_size=None
+    ) -> float:
         pass

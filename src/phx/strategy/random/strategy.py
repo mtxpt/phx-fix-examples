@@ -1,16 +1,17 @@
 import math
 from enum import Enum
 from logging import Logger
-from typing import Dict, Tuple, Optional, Set
-from scipy.stats import bernoulli
+from typing import Tuple, Optional, Set
+
 import pandas as pd
 import quickfix as fix
-
-from phx.utils import TO_PIPS
 from phx.fix.app import AppRunner
 from phx.fix.utils import fix_message_string, flip_trading_dir
-from phx.strategy.base import StrategyBase
-from phx.strategy.base.types import ExchangeId, SymbolId
+from phx.utils import TO_PIPS
+from scipy.stats import bernoulli
+
+from phx.strategy.base import StrategyBase, RoundingDirection
+from phx.strategy.base.types import Ticker
 
 
 class SymbolSelection(str, Enum):
@@ -65,13 +66,11 @@ class RandomStrategy(StrategyBase):
 
         self.public_trades = []
 
-    def round_down(self, price: float) -> Optional[float]:
-        if price >= 0 and self.min_tick_size > 0:
-            return math.floor(price / self.min_tick_size) * self.min_tick_size
+    def round_down(self, price: float, key: Ticker) -> Optional[float]:
+        return self.round(price, RoundingDirection.DOWN, key, self.min_tick_size)
 
-    def round_up(self, price: float) -> Optional[float]:
-        if price >= 0 and self.min_tick_size > 0:
-            return math.ceil(price / self.min_tick_size) * self.min_tick_size
+    def round_up(self, price: float, key: Ticker) -> Optional[float]:
+        return self.round(price, RoundingDirection.UP, key, self.min_tick_size)
 
     def get_symbols_to_trade(self):
         if self.symbol_selection == SymbolSelection.ALL_AT_ONCE:
@@ -123,10 +122,10 @@ class RandomStrategy(StrategyBase):
                 top_ask = book.top_ask_price
                 if top_bid is not None and top_ask is not None:
                     if direction == fix.Side_SELL:
-                        price = self.round_down(top_bid * (1 - TO_PIPS * self.aggressiveness_in_pips))
+                        price = self.round_down(top_bid * (1 - TO_PIPS * self.aggressiveness_in_pips), key)
                         dir_str = "sell"
                     else:
-                        price = self.round_up(top_ask * (1 + TO_PIPS * self.aggressiveness_in_pips))
+                        price = self.round_up(top_ask * (1 + TO_PIPS * self.aggressiveness_in_pips), key)
                         dir_str = "buy"
                     self.logger.info(
                         f"{exchange} Symbol {symbol}: top of book {(top_bid, top_ask)} => "

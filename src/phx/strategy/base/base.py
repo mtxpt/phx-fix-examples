@@ -560,18 +560,22 @@ class StrategyBase(StrategyInterface, abc.ABC):
     def on_trades(self, msg: Trades):
         pass
 
-    def round_down(self, price: float, direction: RoundingDirection, ticker: Ticker) -> Optional[float]:
-        min_tick_size = self.security_list.get_ticker(ticker, 0)
+    def round(self, price: float, direction: RoundingDirection, ticker: Ticker, min_tick_size=None) -> Optional[float]:
+        min_tick_size = min_tick_size if min_tick_size is not None else self.security_list.get_ticker(ticker, 0)
         if price >= 0 and min_tick_size > 0:
             if direction == RoundingDirection.DOWN:
                 return math.floor(price / min_tick_size) * min_tick_size
             elif direction == RoundingDirection.UP:
                 return math.ceil(price / min_tick_size) * min_tick_size
             else:
-                self.logger.error(f"invalid rounding direction: {direction}")
+                self.logger.error(f"invalid rounding direction {direction} for {ticker}")
+                return None
+        else:
+            self.logger.warning(f"not rounding price because of zero tick size for {ticker}")
+            return None
 
-    def tick_round(self, price, ticker: Ticker, min_tick_size=None):
-        min_tick_size = self.security_list.get_ticker(ticker, 0) if min_tick_size is None else min_tick_size
+    def tick_round(self, price, ticker: Ticker, min_tick_size=None) -> float:
+        min_tick_size = min_tick_size if min_tick_size is not None else self.security_list.get_ticker(ticker, 0)
         if min_tick_size <= 0.0:
             return round(price)
         else:
