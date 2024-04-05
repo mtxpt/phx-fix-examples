@@ -181,16 +181,22 @@ class StrategyBase(StrategyInterface, abc.ABC):
                     self.logger.info(f"unknown message {msg}")
 
             except queue.Empty:
-                self.logger.info(f"queue empty after waiting {self.queue_timeout.total_seconds()}s")
+                self.logger.info(
+                    f"[{self.current_exec_state.name}] "
+                    f"queue empty after waiting {self.queue_timeout.total_seconds()}s"
+                )
 
             except Exception as e:
                 self.exception = e
                 self.current_exec_state = StrategyExecState.EXCEPTION
-                self.logger.exception(f"dispatch: exception {e}")
+                self.logger.exception(f"[{self.current_exec_state}] dispatch: exception {e}")
 
             self.exec_state_evaluation()
 
+        self.logger.info(f"[{self.current_exec_state.name}] dispatch loop terminated")
+
     def exec_state_evaluation(self):
+        self.logger.info(f"exec_state_evaluation: state {self.current_exec_state.name}")
         try:
             if self.current_exec_state == StrategyExecState.STARTED:
                 self.trade()
@@ -268,7 +274,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
             self.fix_interface.save_fix_message_history(pre=self.file_name_prefix())
 
         # cancel open orders if required
-        if self.cancel_orders_on_exit and self.logged_in:
+        if self.logged_in and self.cancel_orders_on_exit:
             self.logger.info(f"cancelling orders on exit")
             self.stopping_barriers = self.get_stopping_barriers()
             if self.use_mass_cancel_request:
@@ -398,6 +404,11 @@ class StrategyBase(StrategyInterface, abc.ABC):
         pass
 
     def on_logout(self, msg: Logout):
+        if self.current_exec_state == StrategyExecState.LOGING_IN:
+            self.completed = True
+            error = f"{msg} before successful login most likely caused connection problem or by invalid credentials"
+            self.exception = Exception(error)
+            self.logger.error(error)
         self.logged_in = False
 
     def on_heartbeat(self, msg: Heartbeat):

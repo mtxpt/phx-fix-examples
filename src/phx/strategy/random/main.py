@@ -9,9 +9,14 @@ from phx.fix.app import App, AppRunner, FixSessionConfig, FixAuthenticationMetho
 from phx.strategy.random import RandomStrategy
 
 
-def temp_dir() -> Path:
+def temp_dir():
     local = Path(__file__).parent.resolve()
     return local.parent.parent.parent.parent.absolute() / "temp"
+
+
+def fix_schema_file() -> Path:
+    local = Path(__file__).parent.resolve()
+    return str(local.parent.parent.absolute() / "fix" / "specs" / "FIX44.xml")
 
 
 if __name__ == "__main__":
@@ -34,13 +39,14 @@ if __name__ == "__main__":
     message_queue = queue.Queue()
     fix_configs = FixSessionConfig(
         sender_comp_id="test",
-        target_comp_id="proxy",
+        target_comp_id="phoenix-prime",
         user_name="trader",
         password="secret",
         fix_auth_method=FixAuthenticationMethod.HMAC_SHA256,
         account="T1",
         socket_connect_port="1238",
         socket_connect_host="127.0.0.1",
+        fix_schema_dict=fix_schema_file()
     )
     fix_session_settings = fix_configs.get_fix_session_settings()
 
@@ -49,3 +55,5 @@ if __name__ == "__main__":
 
     strategy = RandomStrategy(app_runner, config, logger)
     strategy.dispatch()
+
+    logger.info("strategy finished")
