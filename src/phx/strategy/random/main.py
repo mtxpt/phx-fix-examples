@@ -5,7 +5,7 @@ import yaml
 from pathlib import Path
 
 from phx.utils import setup_logger, set_file_loging_handler, make_dirs
-from phx.fix.app import App, AppRunner, FixSessionConfig
+from phx.fix.app import App, AppRunner, FixSessionConfig, FixAuthenticationMethod
 from phx.strategy.random import RandomStrategy
 
 
@@ -37,7 +37,7 @@ if __name__ == "__main__":
         target_comp_id="proxy",
         user_name="trader",
         password="secret",
-        auth_by_key=True,
+        fix_auth_method=FixAuthenticationMethod.HMAC_SHA256,
         account="T1",
         socket_connect_port="1238",
         socket_connect_host="127.0.0.1",

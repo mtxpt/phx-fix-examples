@@ -1,16 +1,14 @@
-# Phoenix Prime FIX Client Application 
+# Phoenix Prime FIX Client Examples 
 
-This repository provides a reference __Phoenix Prime__ Client Trading Application in Python, that illustrates 
-how to use the FIX protocol of __Phoenix Prime__ for order execution, obtain streaming market data and build
-trading applications. 
+This repository provides a reference implementation of FIX based trading client connecting to __Phoenix Prime__.
+It illustrates how to use the FIX protocol of __Phoenix Prime__ for order execution and to obtain streaming market 
+data. 
 
-The  widely used [QuickFix](https://quickfixengine.org) open source FIX library and application framework 
-is used to communicate with the __Phoenix Prime__ FIX servers. 
+The FIX client is built on top of the [QuickFix](https://quickfixengine.org) open source FIX library and application framework.
 
 Porting the Client Trading Application to C++, Java or Go is straightforward as QuickFix is available 
-for all of these programming languages. Porting to another FIX library is also not difficult as this 
-Client Trading Application shows how to setup the different outgoing FIX messages and how parse the incoming 
-FIX messages. 
+for all of these programming languages. Porting it to another FIX library should not be difficult as it illustrates
+how to properly setup the different outgoing FIX messages and how to parse the incoming FIX messages. 
 
 
 ## Technical Overview of Phoenix Prime
