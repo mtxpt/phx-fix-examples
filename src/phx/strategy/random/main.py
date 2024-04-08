@@ -33,7 +33,7 @@ if __name__ == "__main__":
     export_dir = temp_dir() / "random"
     make_dirs(export_dir)
     logger = set_file_loging_handler(
-        setup_logger("fix_service", level=logging.INFO),
+        setup_logger("fix_service", level=logging.DEBUG),
         export_dir / "fix_service.log"
     )
     message_queue = queue.Queue()
@@ -54,6 +54,6 @@ if __name__ == "__main__":
     app_runner = AppRunner(app, fix_session_settings, fix_configs.get_session_id(), logger)
 
     strategy = RandomStrategy(app_runner, config, logger)
-    strategy.dispatch()
+    strategy.run()
 
     logger.info("strategy finished")

@@ -1,5 +1,6 @@
 {
-  "trading_symbols": [["deribit", "BTC-PERPETUAL"], ["deribit", "ETH-PERPETUAL"]],
+#  "trading_symbols": [["deribit", "BTC-PERPETUAL"], ["deribit", "ETH-PERPETUAL"]],
+  "trading_symbols": [["deribit", "BTC-PERPETUAL"]],
 
   "quantity": 100,
   "delay": "00:00:05.000",
@@ -16,7 +17,7 @@
   "aggressiveness_in_pips": 2,
 
   # timeout
-  "timeout": "12:00:00.000",
+  "timeout": "00:00:30.000",
 
   # standard timer should fire every one hour - used to save files and purge history data
   "timer_interval": "01:00:00",

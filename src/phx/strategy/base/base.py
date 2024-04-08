@@ -93,9 +93,9 @@ class StrategyBase(StrategyInterface, abc.ABC):
         self.cancel_orders_on_exit = config.get("cancel_orders_on_exit", True)
         self.use_mass_cancel_request = config.get("use_mass_cancel_request", True)
         self.cancel_timeout_seconds = config.get("cancel_timeout_seconds", 5)
-        self.save_before_cancel_orders_on_exit = config.get("save_before_cancel_orders_on_exit", True)
         self.print_reports = config.get("print_reports", True)
 
+        self.timers_started = False
         self.timer_interval = pd.Timedelta(config.get("timer_interval", "01:00:00"))
         self.timer_alignment_freq = config.get("timer_alignment_freq", "1h")
         self.recurring_timer = AlignedRepeatingTimer(
@@ -122,7 +122,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
 
         self.current_exec_state = StrategyExecState.STOPPED
 
-    def get_starting_barriers(self) -> dict:
+    def create_starting_barriers(self) -> dict:
         return {
             self.ORDERBOOK_SNAPSHOTS: self.mkt_symbols.copy(),
             self.POSITION_SNAPSHOTS: 1,
@@ -130,14 +130,23 @@ class StrategyBase(StrategyInterface, abc.ABC):
             self.SECURITY_REPORTS: 1
         }
 
-    def get_stopping_barriers(self) -> dict:
+    def create_stopping_barriers(self) -> dict:
         return {
             self.CANCEL_OPEN_ORDERS: self.trading_symbols.copy()
         }
 
+    def run(self) -> bool:
+        assert self.current_exec_state == StrategyExecState.STOPPED
+        if self.check_if_can_start():
+            self.app_runner.start()
+            self.current_exec_state = StrategyExecState.LOGING_IN
+            self.dispatch()
+            return True
+        return False
+
     def dispatch(self):
-        while not self.completed:
-            try:
+        try:
+            while not self.completed:
                 # blocking here and wait for next message until timeout
                 msg = self.message_queue.get(timeout=self.queue_timeout.total_seconds())
 
@@ -180,70 +189,66 @@ class StrategyBase(StrategyInterface, abc.ABC):
                 else:
                     self.logger.info(f"unknown message {msg}")
 
-            except queue.Empty:
-                self.logger.info(
-                    f"[{self.current_exec_state.name}] "
-                    f"queue empty after waiting {self.queue_timeout.total_seconds()}s"
-                )
+                self.exec_state_evaluation()
 
-            except Exception as e:
-                self.exception = e
-                self.current_exec_state = StrategyExecState.EXCEPTION
-                self.logger.exception(f"[{self.current_exec_state}] dispatch: exception {e}")
+            self.logger.info(f"dispatch loop terminated in state {self.current_exec_state.name}")
 
-            self.exec_state_evaluation()
-
-        self.logger.info(f"[{self.current_exec_state.name}] dispatch loop terminated")
-
-    def exec_state_evaluation(self):
-        self.logger.info(f"exec_state_evaluation: state {self.current_exec_state.name}")
-        try:
-            if self.current_exec_state == StrategyExecState.STARTED:
-                self.trade()
-                if self.check_completed():
-                    self.stopping()
-
-            elif self.current_exec_state == StrategyExecState.STOPPED:
-                if self.check_should_start():
-                    self.app_runner.start()
-                    self.current_exec_state = StrategyExecState.LOGING_IN
-
-            elif self.current_exec_state == StrategyExecState.LOGING_IN:
-                if self.logged_in:
-                    self.current_exec_state = StrategyExecState.LOGGED_IN
-                    self.exec_state_evaluation()
-
-            elif self.current_exec_state == StrategyExecState.LOGGED_IN:
-                self.starting()
-
-            elif self.current_exec_state == StrategyExecState.STARTING:
-                if self.check_started():
-                    self.current_exec_state = StrategyExecState.STARTED
-                    self.exec_state_evaluation()
-
-            elif self.current_exec_state == StrategyExecState.STOPPING:
-                if self.check_stopping():
-                    self.app_runner.stop()
-                    if self.check_should_start():
-                        self.current_exec_state = StrategyExecState.STOPPED
-                    else:
-                        self.current_exec_state = StrategyExecState.FINISHED
-
-            elif self.current_exec_state == StrategyExecState.EXCEPTION:
-                pass
+        except queue.Empty:
+            self.exception = TimeoutError(
+                f"queue empty after waiting {self.queue_timeout.total_seconds()}s"
+            )
+            self.logger.info(
+                f"[{self.current_exec_state.name}] "
+                f"queue empty after waiting {self.queue_timeout.total_seconds()}s"
+            )
 
         except Exception as e:
             self.exception = e
             self.current_exec_state = StrategyExecState.EXCEPTION
-            self.logger.exception(f"exec_state_evaluation: exception {e}")
+            self.logger.exception(
+                f"[{self.current_exec_state}] dispatch: exception {e}"
+            )
+
+        finally:
+            self.stop_timers()
+            try:
+                self.fix_interface.save_fix_message_history(pre=self.file_name_prefix())
+            except Exception as e:
+                self.logger.exception(f"failed to save fix message history: {e}")
+
+    def exec_state_evaluation(self):
+        self.logger.info(f"exec_state_evaluation: state {self.current_exec_state.name}")
+
+        if self.current_exec_state == StrategyExecState.STARTED:
+            self.trade()
+            if self.check_if_completed():
+                self.stopping()
+
+        elif self.current_exec_state == StrategyExecState.LOGING_IN:
+            if self.logged_in:
+                self.current_exec_state = StrategyExecState.LOGGED_IN
+                self.exec_state_evaluation()
+
+        elif self.current_exec_state == StrategyExecState.LOGGED_IN:
+            self.starting()
             self.exec_state_evaluation()
 
-    def check_should_start(self):
+        elif self.current_exec_state == StrategyExecState.STARTING:
+            if self.check_if_started():
+                self.current_exec_state = StrategyExecState.STARTED
+                self.exec_state_evaluation()
+
+        elif self.current_exec_state == StrategyExecState.STOPPING:
+            if self.check_if_stopped():
+                self.app_runner.stop()
+                self.current_exec_state = StrategyExecState.FINISHED
+
+    def check_if_can_start(self):
         return not self.timed_out and not self.completed
 
     def starting(self):
-        self.starting_barriers = self.get_starting_barriers()
-        self.starting_reference = self.get_starting_barriers()
+        self.starting_barriers = self.create_starting_barriers()
+        self.starting_reference = self.create_starting_barriers()
         self.request_security_data()
         self.subscribe_market_data()
         self.request_working_orders()
@@ -254,7 +259,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
             self.subscribe_trade_capture_reports()
         self.current_exec_state = StrategyExecState.STARTING
 
-    def check_started(self):
+    def check_if_started(self):
         self.logger.debug(f"starting_barriers: {self.starting_barriers}")
         rows = sum(
             [
@@ -268,33 +273,24 @@ class StrategyBase(StrategyInterface, abc.ABC):
         return len(self.starting_barriers) == 0
 
     def stopping(self):
-        self.stop_timers()
-
-        if self.save_before_cancel_orders_on_exit:
-            self.fix_interface.save_fix_message_history(pre=self.file_name_prefix())
-
-        # cancel open orders if required
         if self.logged_in and self.cancel_orders_on_exit:
             self.logger.info(f"cancelling orders on exit")
-            self.stopping_barriers = self.get_stopping_barriers()
+            self.stopping_barriers = self.create_stopping_barriers()
+
             if self.use_mass_cancel_request:
                 for (exchange, symbol) in self.trading_symbols:
                     msg = self.fix_interface.order_mass_cancel_request(exchange, symbol)
-                    self.logger.info(f"  order mass cancel request {fix_message_string(msg)}")
+                    self.logger.info(f"order mass cancel request {fix_message_string(msg)}")
             else:
                 for (ord_id, order) in self.order_tracker.open_orders.items():
                     msg = self.fix_interface.order_cancel_request(order)
-                    self.logger.info(f"  order cancel request {fix_message_string(msg)}")
-
-            self.logger.info(f"start waiting for {self.cancel_timeout_seconds}s")
+                    self.logger.info(f"order cancel request {fix_message_string(msg)}")
         else:
             self.logger.info(f"keep orders alive on exit")
 
-        if not self.save_before_cancel_orders_on_exit:
-            self.fix_interface.save_fix_message_history(pre=self.file_name_prefix())
         self.current_exec_state = StrategyExecState.STOPPING
 
-    def check_stopping(self) -> bool:
+    def check_if_stopped(self) -> bool:
         self.logger.debug(f"stopping_barriers: {self.stopping_barriers}")
         rows = sum(
             [
@@ -304,7 +300,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
         self.logger.info(f"stopping_barriers:\n{line}")
         return len(self.stopping_barriers) == 0
 
-    def check_completed(self):
+    def check_if_completed(self):
         now = self.now()
         end = self.start_time + self.timeout
         self.timed_out = now >= end
@@ -383,18 +379,19 @@ class StrategyBase(StrategyInterface, abc.ABC):
     def start_timers(self):
         self.logger.info(f"starting timers...")
         self.recurring_timer.start()
+        self.timers_started = True
 
     def stop_timers(self):
-        self.logger.info(f"stopping timers...")
-        if self.recurring_timer.is_alive():
-            self.recurring_timer.cancel()
-            self.recurring_timer.join()
-        self.logger.info(f"timers stopped")
+        if self.timers_started:
+            self.logger.info(f"stopping timers...")
+            if self.recurring_timer.is_alive():
+                self.recurring_timer.cancel()
+                self.recurring_timer.join()
+            self.logger.info(f"timers stopped")
 
     def on_timer(self):
         self.logger.info(f"saving dataframes and purging history")
         self.fix_interface.save_fix_message_history(pre=self.file_name_prefix(), purge_history=True)
-        # TODO save other stuff
         self.logger.info(f"   \u2705 saved and purged fix message history")
 
     def on_logon(self, msg: Logon):
@@ -420,10 +417,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
         self.exception = Exception("GatewayNotReady")
 
     def on_reject(self, msg: Reject):
-        self.logger.error(
-            f"on_reject: "
-            f"\n  report = [{msg}] "
-        )
+        self.logger.error(f"on_reject: {msg}")
 
     def on_business_message_reject(self, msg: BusinessMessageReject):
         self.logger.error(f"on_business_message_reject: {msg}")
@@ -469,7 +463,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
             if msg.ord_status == fix.OrdStatus_REJECTED:
                 self.on_mass_status_exec_report(MassStatusExecReportNoOrders(msg.exchange, msg.symbol, msg.text))
             elif msg.is_mass_status:
-                assert msg.tot_num_reports is not None and msg.last_rpt_requested is not None
+                assert msg.tot_num_reports is not None
                 self.mass_status_exec_reports.append(msg)
                 if len(self.mass_status_exec_reports) == msg.tot_num_reports and msg.last_rpt_requested:
                     self.on_mass_status_exec_report(MassStatusExecReport(self.mass_status_exec_reports))
@@ -489,6 +483,9 @@ class StrategyBase(StrategyInterface, abc.ABC):
                 else:
                     self.stopping_barriers.pop(self.CANCEL_OPEN_ORDERS)
                     self.logger.info(f"<==== all open orders cancelled")
+
+                    self.fix_interface.save_fix_message_history(pre=self.file_name_prefix())
+                    self.logger.info(f"<==== FIX message history saved")
 
     def on_status_exec_report(self, msg: ExecReport):
         if self.print_reports:
@@ -594,7 +591,10 @@ class StrategyBase(StrategyInterface, abc.ABC):
             return math.trunc(price) + rem * min_tick_size
 
     def file_name_prefix(self) -> str:
-        username = self.fix_interface.get_username()
-        account = self.fix_interface.get_account()
         timestamp = pd.Timestamp.utcnow().strftime("%Y_%m_%d_%H%M%S")
-        return f"{timestamp}_{username}_{account}"
+        try:
+            username = self.fix_interface.get_username()
+            account = self.fix_interface.get_account()
+            return f"{timestamp}_{username}_{account}"
+        except Exception:
+            return f"{timestamp}"

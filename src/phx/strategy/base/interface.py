@@ -18,9 +18,9 @@ class StrategyExecState(IntEnum):
     STARTING = 3
     STARTED = 4
     STOPPING = 5
-    EXCEPTION = 6
-    LOGGED_OUT = 7
-    FINISHED = 8
+    LOGGED_OUT = 6
+    FINISHED = 7
+    EXCEPTION = 8
 
 
 class RoundingDirection(IntEnum):
@@ -35,6 +35,10 @@ class StrategyInterface(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def run(self) -> bool:
+        pass
+
+    @abc.abstractmethod
     def dispatch(self):
         pass
 
@@ -43,7 +47,7 @@ class StrategyInterface(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def check_should_start(self):
+    def check_if_can_start(self):
         pass
 
     @abc.abstractmethod
@@ -51,7 +55,7 @@ class StrategyInterface(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def check_started(self) -> bool:
+    def check_if_started(self) -> bool:
         pass
 
     @abc.abstractmethod
@@ -59,11 +63,11 @@ class StrategyInterface(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def check_stopping(self) -> bool:
+    def check_if_stopped(self) -> bool:
         pass
 
     @abc.abstractmethod
-    def check_completed(self) -> bool:
+    def check_if_completed(self) -> bool:
         pass
 
     @abc.abstractmethod
