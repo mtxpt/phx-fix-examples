@@ -20,7 +20,6 @@ class StrategyExecState(IntEnum):
     STOPPING = 5
     LOGGED_OUT = 6
     FINISHED = 7
-    EXCEPTION = 8
 
 
 class RoundingDirection(IntEnum):

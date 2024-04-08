@@ -204,7 +204,6 @@ class StrategyBase(StrategyInterface, abc.ABC):
 
         except Exception as e:
             self.exception = e
-            self.current_exec_state = StrategyExecState.EXCEPTION
             self.logger.exception(
                 f"[{self.current_exec_state}] dispatch: exception {e}"
             )

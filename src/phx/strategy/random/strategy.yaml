@@ -1,6 +1,6 @@
 {
-#  "trading_symbols": [["deribit", "BTC-PERPETUAL"], ["deribit", "ETH-PERPETUAL"]],
-  "trading_symbols": [["deribit", "BTC-PERPETUAL"]],
+  "trading_symbols": [["deribit", "BTC-PERPETUAL"], ["deribit", "ETH-PERPETUAL"]],
+#  "trading_symbols": [["deribit", "BTC-PERPETUAL"]],
 
   "quantity": 100,
   "delay": "00:00:05.000",
