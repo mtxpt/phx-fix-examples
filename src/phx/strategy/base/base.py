@@ -9,8 +9,8 @@ import quickfix as fix
 from phx.fix.app.interface import FixInterface
 from phx.fix.app.app_runner import AppRunner
 from phx.fix.model import ExecReport, PositionReports, Security, SecurityReport, TradeCaptureReport
-from phx.fix.model import GatewayNotReady, Reject, BusinessMessageReject, MarketDataRequestReject
-from phx.fix.model import Logon, Create, Logout, Heartbeat
+from phx.fix.model import Reject, BusinessMessageReject, MarketDataRequestReject
+from phx.fix.model import Logon, Create, Logout, Heartbeat, NotConnected, GatewayNotReady
 from phx.fix.model import Order, OrderBookSnapshot, OrderBookUpdate, Trades
 from phx.fix.model import OrderMassCancelReport, MassStatusExecReport, MassStatusExecReportNoOrders
 from phx.fix.model import PositionRequestAck, TradeCaptureReportRequestAck
@@ -178,8 +178,10 @@ class StrategyBase(StrategyInterface, abc.ABC):
                     self.on_position_request_ack(msg)
                 elif isinstance(msg, TradeCaptureReportRequestAck):
                     self.on_trade_capture_report_request_ack(msg)
+                elif isinstance(msg, NotConnected):
+                    self.on_connection_error(msg)
                 elif isinstance(msg, GatewayNotReady):
-                    self.on_gateway_not_ready(msg)
+                    self.on_connection_error(msg)
                 elif isinstance(msg, Logon):
                     self.on_logon(msg)
                 elif isinstance(msg, Logout):
@@ -205,7 +207,7 @@ class StrategyBase(StrategyInterface, abc.ABC):
         except Exception as e:
             self.exception = e
             self.logger.exception(
-                f"[{self.current_exec_state}] dispatch: exception {e}"
+                f"[{self.current_exec_state.name}] dispatch: exception {e}"
             )
 
         finally:
@@ -410,10 +412,11 @@ class StrategyBase(StrategyInterface, abc.ABC):
     def on_heartbeat(self, msg: Heartbeat):
         pass
 
-    def on_gateway_not_ready(self, msg: GatewayNotReady):
-        self.logger.error(f"on_gateway_not_ready: {msg}")
+    def on_connection_error(self, msg: Union[NotConnected, GatewayNotReady]):
+        self.logger.error(f"on_connection_error: {msg}")
         self.completed = True
-        self.exception = Exception("GatewayNotReady")
+        self.exception = Exception(f"Connection error {msg}")
+        raise self.exception
 
     def on_reject(self, msg: Reject):
         self.logger.error(f"on_reject: {msg}")

@@ -1,12 +1,12 @@
 import abc
 from enum import IntEnum
 import pandas as pd
-from typing import Union, Optional, Tuple
+from typing import Union, Optional, Tuple, Union
 
 from phx.fix.model import Logon, Create, Logout, Heartbeat
 from phx.fix.model import OrderBookSnapshot, OrderBookUpdate, Trades
 from phx.fix.model import ExecReport, PositionReports, SecurityReport, TradeCaptureReport
-from phx.fix.model import GatewayNotReady, Reject, BusinessMessageReject, MarketDataRequestReject
+from phx.fix.model import GatewayNotReady, NotConnected, Reject, BusinessMessageReject, MarketDataRequestReject
 from phx.fix.model import PositionRequestAck, TradeCaptureReportRequestAck
 from phx.fix.model import OrderMassCancelReport, MassStatusExecReport, MassStatusExecReportNoOrders
 
@@ -126,7 +126,7 @@ class StrategyInterface(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def on_gateway_not_ready(self, msg: GatewayNotReady):
+    def on_connection_error(self, msg: Union[NotConnected, GatewayNotReady]):
         pass
 
     @abc.abstractmethod
