@@ -3,10 +3,11 @@ import logging
 import queue
 import yaml
 from pathlib import Path
-
+# external Phoenix library
 from phx.utils import setup_logger, set_file_loging_handler, make_dirs
 from phx.fix.app import App, AppRunner, FixSessionConfig
 from phx.fix.model.auth import FixAuthenticationMethod
+# internal module
 from phx.strategy.random import RandomStrategy
 
 

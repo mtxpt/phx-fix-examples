@@ -1,3 +1,4 @@
+import os
 from enum import Enum
 from logging import Logger
 from typing import Tuple, Optional, Set
@@ -9,8 +10,9 @@ from phx.fix.utils import fix_message_string, flip_trading_dir
 from phx.utils import TO_PIPS
 from scipy.stats import bernoulli
 
-from phx.strategy.base import StrategyBase, RoundingDirection
-from phx.strategy.base.types import Ticker
+from phx.api.base import StrategyBase
+from phx.api.base.interface import RoundingDirection
+from phx.api.base.types import Ticker
 
 
 class SymbolSelection(str, Enum):
