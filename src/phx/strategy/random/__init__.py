@@ -1,1 +1,1 @@
-from .strategy import RandomStrategy
+from .random_strategy import RandomStrategy

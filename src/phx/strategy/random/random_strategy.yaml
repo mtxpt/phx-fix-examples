@@ -1,6 +1,6 @@
 {
-  "trading_symbols": [["deribit", "BTC-PERPETUAL"], ["deribit", "ETH-PERPETUAL"]],
-#  "trading_symbols": [["deribit", "BTC-PERPETUAL"]],
+  "exchange": "deribit",
+  "trading_symbols": ["BTC-PERPETUAL", "ETH-PERPETUAL"],
 
   "quantity": 100,
   "delay": "00:00:05.000",
@@ -21,6 +21,7 @@
 
   # standard timer should fire every one hour - used to save files and purge history data
   "timer_interval": "01:00:00",
+  "trade_interval": "5s",
   "timer_alignment_freq": "1h",
 
   # cancel on exit

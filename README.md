@@ -74,7 +74,7 @@ FIX schema file. __Phoenix Prime__ uses the schema provided in `phx/fix_spec/FIX
 
 ### Running a FIX Based Trading Strategy 
 
-The submodule `phx.random.strategy` contains a fully functional FIX trading application, which 
+The submodule `phx.strategy.random` contains a fully functional FIX trading application, which 
 provides useful standard trading functionalities such as
 
   - Get the security list of the exchange 
@@ -82,18 +82,32 @@ provides useful standard trading functionalities such as
   - Get instrument meta data from the exchange
   - Get initial position snapshot and wallet balances from the trading account
   - Get initial working orders from the trading account
-  - Send requests for new order, order modification and order canceling 
+  - Send requests for new order and order canceling 
   - Parse FIX messages and represent them with Python objects
   - Keep track of the order book of selected symbols 
 
 It also implements basic OEM services such as tracking the state of orders and positions 
 from FIX execution reports. 
 
-The strategy can be configured via the `stragegy.yaml` file.
+The strategy code uses API classes from `phx-fix-base` package.
+#### Install `phx-fix-base` package
+1. Clone GitHub repository to your computer `% git clone git@github.com:mtxpt/phx-fix-base.git`.
+2. In `phx-fix-examples` folder run `% source <phx-fix-examples>/opt/conda/bin/activate dev`
+3. `pip install git+file:///<full path to phx-fix-base>`
+4. Note: to reinstall a new version of `phx-fix-base` package run `pip uninstall phx-fix-base` and then install command from the previous step.
 
-To run the trading application, run the Bash script `phx/random/strategy/start.sh` or
-the Python script `phx/random/strategy/main.py`.
+#### Configure the strategy
+The strategy can be configured via the `<phx-fix-examples>/src/phx/strategy/random/random_strategy.yaml` file.
 
+#### Run the strategy
+To run the trading application, 
+```bash
+% source <phx-fix-examples>/opt/conda/bin/activate dev
+% cd <phx-fix-examples>/src/phx/strategy/random
+% ./start.sh
+or 
+% python3 main.py
+```
 
 ## FIX Protocol Pointers
 
