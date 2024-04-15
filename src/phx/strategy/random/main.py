@@ -4,11 +4,13 @@ import queue
 import yaml
 from datetime import datetime
 from pathlib import Path
-# external Phoenix library
+
+# external Phoenix FIX foundation library - refer to requirements.txt
 from phx.utils import setup_logger, set_file_loging_handler, make_dirs
 from phx.fix.app import App, AppRunner, FixSessionConfig
 from phx.fix.model.auth import FixAuthenticationMethod
-# internal module
+
+# internal Phoenix FIX example library
 from phx.strategy.random import RandomStrategy
 
 

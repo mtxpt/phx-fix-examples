@@ -5,13 +5,14 @@ from logging import Logger
 
 import pandas as pd
 import quickfix as fix
-# Phx modules
+
 from phx.api import DependencyAction, PhxApi
 from phx.fix.app import AppRunner
 from phx.fix.utils import fix_message_string, flip_trading_dir
 from phx.utils import TO_PIPS
 from phx.utils.price_utils import price_round_down, price_round_up
 from phx.utils.time import utcnow
+
 
 class TradingMode(str, Enum):
     MARKET_ORDERS = "market_orders"
@@ -52,11 +53,13 @@ class RandomStrategy:
             logger=self.logger,
             callbacks=callbacks,
         )
+
         # time settings
         self.start_time = utcnow()
         self.timeout = pd.Timedelta(config.get("timeout", "00:00:30"))
         self.last_trade_time = pd.Timestamp(0, tz="UTC")
         self.trade_interval = pd.Timedelta(config.get("trade_interval", "5s"))
+
         # order settings
         self.quantity = config["quantity"]
         self.trading_mode = TradingMode.PASSIVE_LIMIT_ORDERS
@@ -78,14 +81,14 @@ class RandomStrategy:
 
     def is_ready_to_trade(self) -> bool:
         """
-        Example of a function that checks that API received all data
-        necessary to trade.
+        Example of a function that checks that API received all data necessary to trade.
+
         Returns
         -------
         True if all data received and algo ready to trade,
         False otherwise
         """
-        fn = "is_ready_to_trade"
+        fn = self.is_ready_to_trade.__name__
         is_ready = True
         # check that per-symbol data (ob snapshot and working orders) is ready
         for symbol in self.trading_symbols:
@@ -118,7 +121,7 @@ class RandomStrategy:
         return is_ready
 
     def strategy_loop(self):
-        fn = "strategy_loop"
+        fn = self.strategy_loop.__name__
         api_finished = False
         try:
             while not api_finished:
@@ -145,7 +148,7 @@ class RandomStrategy:
         return direction
 
     def submit_market_orders(self):
-        fn = "submit_market_orders"
+        fn = self.submit_market_orders.__name__
         direction = self.get_trading_direction()
         symbols = self.get_symbols_to_trade()
         account = self.phx_api.fix_interface.get_account()
@@ -184,7 +187,7 @@ class RandomStrategy:
                 self.logger.info(f"{fn}: {self.exchange=}/{symbol=}: mid-price missing!")
 
     def submit_limit_orders(self):
-        fn = "submit_limit_orders"
+        fn = self.submit_limit_orders.__name__
         direction = self.get_trading_direction()
         symbols = self.get_symbols_to_trade()
         account = self.phx_api.fix_interface.get_account()
