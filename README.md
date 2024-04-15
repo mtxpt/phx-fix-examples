@@ -8,6 +8,9 @@ The project depends on the open sourced [Phoenix Prime FIX Foundation Package](h
 which illustrates how to properly set up the different outgoing FIX messages and how to parse the incoming FIX 
 messages. The underlying FIX engine is the open source FIX library and application framework [QuickFIX](https://QuickFIXengine.org).
 
+Details on the Phoenix Prime Service API and the Phoenix Prime FIX endpoints can be found in the 
+official Phoenix Prime [documentation](https://www.matrixport.com/docs/en-us/phoenix.html). 
+
 
 ## Requirements  
 
