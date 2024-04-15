@@ -18,9 +18,8 @@ pytest
 deepdiff
 prometheus_client
 
-# pip install git+https://github.com/mtxpt/phx-fix-base.git@master
-# pip install git+file:///Users/dani/repos-work/matrixport/work/phx-fix-base
-# pip uninstall phx-fix-base
+# Phoenix Prime FIX foundation package
+phx-fix-base @ git+https://github.com/mtxpt/phx-fix-base.git@master
 
 # arch other than arm64 and Windows should be able to install quickfix without a patch
 quickfix; platform_machine != 'arm64' and sys_platform != 'win32'
