@@ -6,12 +6,12 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src/"]
-include = ["phx.strategy", "phx.strategy.base", "phx.strategy.random", "phx.service"]
+include = ["phx.strategy", "phx.strategy.random"]
 
 [project]
 name = "phx-fix-examples"
-description = "Phoenix Prime FIX strategy examples"
-version = "0.9"
+description = "Phoenix Prime FIX client sxamples package"
+version = "1.0"
 readme = "README.md"
 license = {file = "LICENSE"}
 authors = [
