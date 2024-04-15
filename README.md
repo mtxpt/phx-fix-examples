@@ -4,7 +4,7 @@ This package provides a reference implementation of FIX based trading client con
 It illustrates how to use the FIX protocol of __Phoenix Prime__ for order execution and to obtain streaming market 
 data. 
 
-The project depends on the open sourced [Phoenix Prime FIX Foundation Package](https://github.com/mtxpt/phx-fix-base).
+The project depends on the open sourced [Phoenix Prime FIX Foundation Package](https://github.com/mtxpt/phx-fix-base),
 which illustrates how to properly set up the different outgoing FIX messages and how to parse the incoming FIX 
 messages. The underlying FIX engine is the open source FIX library and application framework [QuickFIX](https://QuickFIXengine.org).
 
