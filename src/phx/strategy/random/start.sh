@@ -6,4 +6,4 @@ ROOT="$(dirname "$SCRIPT_DIR")"
 source "$ROOT"/../../../opt/conda/bin/activate dev
 
 export PYTHONPATH="$ROOT"/../../:"$PYTHONPATH"
-cd "$ROOT"/random || (echo "Wrong path!" && exit); python3 main.py
+cd "$ROOT"/random || (echo "Wrong path!" && exit); python main.py

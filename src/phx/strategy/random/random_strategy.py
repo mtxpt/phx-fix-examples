@@ -2,6 +2,7 @@ import time
 from datetime import datetime, timezone
 from enum import Enum
 from logging import Logger
+import random
 
 import pandas as pd
 import quickfix as fix
@@ -20,7 +21,10 @@ class TradingMode(str, Enum):
 
 
 def generic_callback(msg, logger):
-    logger.info(f"Callback msg_type:{type(msg).__name__} {msg=}")
+    try:
+        logger.info(f"Callback msg_type:{type(msg).__name__} msg={str(msg)}")
+    except:
+        logger.info(f"Error in parsing msg object: Callback msg_type:{type(msg).__name__} {msg=}")
 
 
 class RandomStrategy:
@@ -142,21 +146,65 @@ class RandomStrategy:
             self.logger.error(f"{fn}: Exception: {e}")
             self.phx_api.to_stop = True
 
-    def get_trading_direction(self):
-        direction = self.current_trading_direction
-        self.current_trading_direction = flip_trading_dir(self.current_trading_direction)
-        return direction
-
-    def submit_market_orders(self):
-        fn = self.submit_market_orders.__name__
-        direction = self.get_trading_direction()
-        symbols = self.get_symbols_to_trade()
+    def submit_market_order(self, symbol_index=0, direction=fix.Side_BUY):
+        fn = self.submit_market_order.__name__
+        symbol = (self.get_symbols_to_trade())[symbol_index]
         account = self.phx_api.fix_interface.get_account()
         start_time = datetime.now(timezone.utc)
-        for symbol in symbols:
-            ticker = (self.exchange, symbol)
-            book = self.phx_api.order_books.get(ticker)
-            if book and book.mid_price:
+        ticker = (self.exchange, symbol)
+        book = self.phx_api.order_books.get(ticker)
+        if book and book.mid_price:
+            sent_order = False
+            while not sent_order:
+                if self.phx_api.rate_limiter.has_capacity(datetime.now(timezone.utc), 1):
+                    self.phx_api.rate_limiter.consume(datetime.now(timezone.utc))
+                    order, msg = self.phx_api.fix_interface.new_order_single(
+                        self.exchange,
+                        symbol,
+                        direction,
+                        self.quantity,
+                        ord_type=fix.OrdType_MARKET,
+                        account=account,
+                    )
+                    self.logger.info(
+                        f"{fn}: {self.exchange=}/{symbol=}: MKT {direction}"
+                        f" order submitted {fix_message_string(msg)}"
+                    )
+                    sent_order = True
+                else:
+                    self.logger.info(f"{fn}: no rate limit capacity")
+                    since_start = pd.Timedelta(datetime.now(timezone.utc) - start_time)
+                    if since_start > self.trade_interval:
+                        self.logger.info(f"{fn}: waited {since_start} since start. Abandon.")
+                        return
+                    else:
+                        self.logger.info(f"{fn}: sleep for 1 second")
+                        time.sleep(1)
+        else:
+            self.logger.info(f"{fn}: {self.exchange=}/{symbol=}: mid-price missing!")
+
+    def submit_limit_order(self, symbol_index=1, direction=fix.Side_SELL):
+        fn = self.submit_limit_order.__name__
+        symbol = (self.get_symbols_to_trade())[symbol_index]
+        account = self.phx_api.fix_interface.get_account()
+        start_time = datetime.now(timezone.utc)
+        ticker = (self.exchange, symbol)
+        book = self.phx_api.order_books.get(ticker, None)
+        min_tick_size = self.phx_api.get_security_attribute(ticker, 'min_price_increment')
+        if book and min_tick_size:
+            top_bid = book.top_bid_price
+            top_ask = book.top_ask_price
+            if top_bid and top_ask:
+                if direction == fix.Side_SELL:
+                    price = price_round_down(top_ask * (1 + TO_PIPS * self.aggressiveness_in_pips), min_tick_size)
+                    dir_str = "sell"
+                else:
+                    price = price_round_up(top_bid * (1 - TO_PIPS * self.aggressiveness_in_pips), min_tick_size)
+                    dir_str = "buy"
+                self.logger.info(
+                    f"{fn}: {self.exchange}/{symbol}: top of book {(top_bid, top_ask)} => "
+                    f"passive {dir_str} order {self.quantity} @ {price}"
+                )
                 sent_order = False
                 while not sent_order:
                     if self.phx_api.rate_limiter.has_capacity(datetime.now(timezone.utc), 1):
@@ -166,12 +214,13 @@ class RandomStrategy:
                             symbol,
                             direction,
                             self.quantity,
-                            ord_type=fix.OrdType_MARKET,
+                            price,
+                            ord_type=fix.OrdType_LIMIT,
                             account=account,
                         )
                         self.logger.info(
-                            f"{fn}: {self.exchange=}/{symbol=}: MKT {direction}"
-                            f" order submitted {fix_message_string(msg)}"
+                            f"{fn}: {self.exchange}/{symbol}: passive {dir_str} "
+                            f" order submitted:{fix_message_string(msg)}"
                         )
                         sent_order = True
                     else:
@@ -184,76 +233,25 @@ class RandomStrategy:
                             self.logger.info(f"{fn}: sleep for 1 second")
                             time.sleep(1)
             else:
-                self.logger.info(f"{fn}: {self.exchange=}/{symbol=}: mid-price missing!")
-
-    def submit_limit_orders(self):
-        fn = self.submit_limit_orders.__name__
-        direction = self.get_trading_direction()
-        symbols = self.get_symbols_to_trade()
-        account = self.phx_api.fix_interface.get_account()
-        start_time = datetime.now(timezone.utc)
-        for symbol in symbols:
-            ticker = (self.exchange, symbol)
-            book = self.phx_api.order_books.get(ticker, None)
-            min_tick_size = self.phx_api.get_security_attribute(ticker, 'min_price_increment')
-            if book and min_tick_size:
-                top_bid = book.top_bid_price
-                top_ask = book.top_ask_price
-                if top_bid and top_ask:
-                    if direction == fix.Side_SELL:
-                        price = price_round_down(top_ask * (1 + TO_PIPS * self.aggressiveness_in_pips), min_tick_size)
-                        dir_str = "sell"
-                    else:
-                        price = price_round_up(top_bid * (1 - TO_PIPS * self.aggressiveness_in_pips), min_tick_size)
-                        dir_str = "buy"
-                    self.logger.info(
-                        f"{fn}: {self.exchange}/{symbol}: top of book {(top_bid, top_ask)} => "
-                        f"passive {dir_str} order {self.quantity} @ {price}"
-                    )
-                    sent_order = False
-                    while not sent_order:
-                        if self.phx_api.rate_limiter.has_capacity(datetime.now(timezone.utc), 1):
-                            self.phx_api.rate_limiter.consume(datetime.now(timezone.utc))
-                            order, msg = self.phx_api.fix_interface.new_order_single(
-                                self.exchange,
-                                symbol,
-                                direction,
-                                self.quantity,
-                                price,
-                                ord_type=fix.OrdType_LIMIT,
-                                account=account,
-                            )
-                            self.logger.info(
-                                f"{fn}: {self.exchange}/{symbol}: passive {dir_str} "
-                                f" order submitted:{fix_message_string(msg)}"
-                            )
-                            sent_order = True
-                        else:
-                            self.logger.info(f"{fn}: no rate limit capacity")
-                            since_start = pd.Timedelta(datetime.now(timezone.utc) - start_time)
-                            if since_start > self.trade_interval:
-                                self.logger.info(f"{fn}: waited {since_start} since start. Abandon.")
-                                return
-                            else:
-                                self.logger.info(f"{fn}: sleep for 1 second")
-                                time.sleep(1)
-                else:
-                    self.logger.info(
-                        f"{fn}: order book for {self.exchange=}/{symbol=} {top_bid=} {top_ask=}"
-                    )
-            else:
-                self.logger.warning(
-                    f"{fn}: empty either order book for {self.exchange=}/{symbol=} or {min_tick_size=}"
+                self.logger.info(
+                    f"{fn}: order book for {self.exchange=}/{symbol=} {top_bid=} {top_ask=}"
                 )
+        else:
+            self.logger.warning(
+                f"{fn}: empty either order book for {self.exchange=}/{symbol=} or {min_tick_size=}"
+            )
 
     def trade(self):
         now = pd.Timestamp.utcnow()
-        if now > self.last_trade_time + self.trade_interval:
-            self.logger.info(f"====> run trading step {now}")
-            self.last_trade_time = now
-            if self.trading_mode == TradingMode.MARKET_ORDERS:
-                self.submit_market_orders()
-                self.trading_mode = TradingMode.PASSIVE_LIMIT_ORDERS
-            elif self.trading_mode == TradingMode.PASSIVE_LIMIT_ORDERS:
-                self.submit_limit_orders()
-                self.trading_mode = TradingMode.MARKET_ORDERS
+        symbols = self.get_symbols_to_trade()
+        if len(symbols) <= 1:
+            self.logger.info("Insufficient symbols for random strategy - at least 2 symbols are required. No trade.")
+        else:
+            if now > self.last_trade_time + self.trade_interval:
+                self.logger.info(f"====> run trading step {now}")
+                self.last_trade_time = now
+                coin_toss = random.randint(0, 1)
+                if coin_toss == 0:
+                    self.submit_market_order()
+                elif coin_toss == 1:
+                    self.submit_limit_order()
