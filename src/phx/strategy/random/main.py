@@ -11,7 +11,7 @@ from phx.fix.app import App, AppRunner, FixSessionConfig
 from phx.fix.model.auth import FixAuthenticationMethod
 
 # internal Phoenix FIX example library
-from phx.strategy.random import RandomStrategy
+from src.phx.strategy.random import RandomStrategy
 
 
 def temp_dir() -> Path:

@@ -17,6 +17,7 @@ netifaces-plus
 pytest
 deepdiff
 prometheus_client
+eventkit
 
 # Phoenix Prime FIX foundation package
 phx-fix-base @ git+https://github.com/mtxpt/phx-fix-base.git@main
